@@ -23,8 +23,16 @@ extern "C" {
 
 #include "flood.h"
 
-// static const unsigned node[] = { 0x45a4c4ef };
 static const char *node[] = { "69.164.196.239" };
+
+struct params {
+    int num_tr;
+    int xl;
+    int dl;
+    char *hash;
+    char *dn;
+    char *tr[];
+};
 
 void die(const char *message)
 {
@@ -113,7 +121,7 @@ char *_substr(const char *string, int pos, int len)
         if (len < 0) len = length - pos;
     }
     if (pos + len > length) len = length - pos;
-    if ((substring = malloc(sizeof(*substring)*(len+1))) == NULL)
+    if ( (substring = malloc(sizeof(*substring)*(len+1))) == NULL)
         return NULL;
     len += pos;
     for (i = 0; pos != len; i++, pos++)
@@ -125,10 +133,12 @@ char *_substr(const char *string, int pos, int len)
 
 void runserver(void)
 {
-    int sockfd, rc, reuse;
+    int sockfd, rc, reuse, len;
     char buf[BUFLEN + 1];
-    char *external_ip, *local_ip, *read, *btih, *hash, *err = NULL;
+    char *external_ip, *local_ip, *walk, *next, *read, *err = NULL;
+    char *xl, *dl, *tr;
     size_t read_len;
+    struct params magnet;
     struct sockaddr_in servaddr, cliaddr, ip;
     socklen_t slen = sizeof servaddr;
     leveldb_t *db;
@@ -173,7 +183,7 @@ void runserver(void)
     roptions = leveldb_readoptions_create();
     woptions = leveldb_writeoptions_create();
     leveldb_options_set_create_if_missing(options, 1);
-    
+
     loop {
         if (recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *)&cliaddr, &slen) == -1)
             die("recvfrom failed");
@@ -181,21 +191,46 @@ void runserver(void)
         debug("Receive packet from %s:%d\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port));
         // debug("Data: %s\n\n", buf);
 
-        // parse the magnet link and extract parameters
-        if (!(btih = strstr(buf, "btih:"))) {
+        // parse the magnet link and get infohash
+        if (!(walk = strstr(buf, "btih:"))) {
             debug(" - Skip: infohash not found\n");
             continue;
         }
-        hash = _substr(btih, 5, HASHLEN - 1);
+        magnet.hash = _substr(walk, 5, HASHLEN - 1);
+        walk += HASHLEN + 5;
+
+        // extract the remaining link parameters
+        len = (int)strlen(buf);
+        magnet.num_tr = 0;
+        while ( (walk = strstr(walk, "&"))) {
+            walk++;
+            next = strstr(walk, "&");
+            len = (next) ? next - walk : (int)strlen(buf) - len;
+            if (walk[0] == 'd' && walk[1] == 'n') {
+                magnet.dn = _substr(walk, 3, len);
+                debug("dn: %s\n", magnet.dn);
+            } else if (walk[0] == 'x' && walk[1] == 'l') {
+                xl = _substr(walk, 3, len);
+                magnet.xl = atoi(xl);
+                debug("xl: %d\n", magnet.xl);
+            } else if (walk[0] == 'd' && walk[1] == 'l') {
+                dl = _substr(walk, 3, len);
+                magnet.dl = atoi(dl);
+                debug("dl: %d\n", magnet.dl);
+            } else if (walk[0] == 't' && walk[1] == 'r') {
+                magnet.tr[magnet.num_tr++] = _substr(walk, 3, len);
+                debug("tr: %s\n", magnet.tr[magnet.num_tr - 1]);
+            }
+        }
 
         // check if the hash exists already
-        debug(" - BT infohash: %s\n", hash);
+        debug(" - BT infohash: %s\n", magnet.hash);
         db = leveldb_open(options, DB, &err);
         if (err != NULL) {
             leveldb_free(err);
             die("Failed to open database");
         }
-        read = leveldb_get(db, roptions, hash, HASHLEN, &read_len, &err);
+        read = leveldb_get(db, roptions, magnet.hash, HASHLEN, &read_len, &err);
         if (err != NULL) {
             leveldb_free(err);
             leveldb_close(db);
@@ -208,7 +243,7 @@ void runserver(void)
             debug(" - Skip: link already in database\n");
         } else {
             debug(" - Save link to database\n");
-            leveldb_put(db, woptions, hash, HASHLEN, buf, BUFLEN, &err);
+            leveldb_put(db, woptions, magnet.hash, HASHLEN, buf, BUFLEN, &err);
             if (err != NULL) {
                 leveldb_free(err);
                 leveldb_close(db);

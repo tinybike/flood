@@ -44,13 +44,10 @@ extern "C" {
 
 #include "dbg.h"
 
-#define LISTENQ 1024
-#define MAXLINE 4096
 #define HASHLEN 41
 #define BUFLEN 4096
-
-#define DB "links"
 #define PORT 9876
+#define DB "links"
 
 #ifdef EPROTO
 #define RETRY 0

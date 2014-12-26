@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-O2 -g -Wall -Wextra -rdynamic -Isrc $(OPTFLAGS)
+CFLAGS=-O2 -g -Wall -Wno-unused -Wextra -rdynamic -Isrc $(OPTFLAGS)
 LIBS=-ldl -lm -lcurl -lleveldb -lsnappy $(OPTLIBS)
 CLEANFILES=core core.* *.core *.o *.out src/*.o links/* links
 
