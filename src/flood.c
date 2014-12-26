@@ -197,6 +197,7 @@ void runserver(void)
             continue;
         }
         magnet.hash = _substr(walk, 5, HASHLEN - 1);
+        debug(" - BT infohash: %s\n", magnet.hash);
         walk += HASHLEN + 5;
 
         // extract the remaining link parameters
@@ -208,23 +209,22 @@ void runserver(void)
             len = (next) ? next - walk : (int)strlen(buf) - len;
             if (walk[0] == 'd' && walk[1] == 'n') {
                 magnet.dn = _substr(walk, 3, len);
-                debug("dn: %s\n", magnet.dn);
+                debug(" - dn:    %s\n", magnet.dn);
             } else if (walk[0] == 'x' && walk[1] == 'l') {
                 xl = _substr(walk, 3, len);
                 magnet.xl = atoi(xl);
-                debug("xl: %d\n", magnet.xl);
+                debug(" - xl:    %d\n", magnet.xl);
             } else if (walk[0] == 'd' && walk[1] == 'l') {
                 dl = _substr(walk, 3, len);
                 magnet.dl = atoi(dl);
-                debug("dl: %d\n", magnet.dl);
+                debug(" - dl:    %d\n", magnet.dl);
             } else if (walk[0] == 't' && walk[1] == 'r') {
                 magnet.tr[magnet.num_tr++] = _substr(walk, 3, len);
-                debug("tr: %s\n", magnet.tr[magnet.num_tr - 1]);
+                debug(" - tr[%d]: %s\n", magnet.num_tr - 1, magnet.tr[magnet.num_tr - 1]);
             }
         }
 
         // check if the hash exists already
-        debug(" - BT infohash: %s\n", magnet.hash);
         db = leveldb_open(options, DB, &err);
         if (err != NULL) {
             leveldb_free(err);
