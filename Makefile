@@ -1,7 +1,7 @@
 CC=gcc
-CFLAGS=-O2 -g -Wall -Wno-unused -Wextra -rdynamic -Isrc $(OPTFLAGS)
+CFLAGS=-std=c89 -O2 -g -Wall -Wextra -rdynamic -pthread -pedantic -Isrc $(OPTFLAGS)
 LIBS=-ldl -lm -lcurl -lleveldb -lsnappy $(OPTLIBS)
-CLEANFILES=core core.* *.core *.o *.out src/*.o links/* links
+CLEANFILES=core core.* *.core *.o *.out src/*.o
 
 all: flood
 

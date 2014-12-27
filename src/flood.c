@@ -31,7 +31,7 @@ struct params {
     int dl;
     char *hash;
     char *dn;
-    char *tr[];
+    char *tr[MAXTR];
 };
 
 void die(const char *message)
@@ -60,7 +60,7 @@ char *get_external_ip(void)
     curl_global_init(CURL_GLOBAL_ALL);
     curl_handle = curl_easy_init();
 
-    // ipecho.net/plain or ipinfo.io/ip (also IPv6)
+    /* ipecho.net/plain or ipinfo.io/ip (also IPv6) */
     curl_easy_setopt(curl_handle, CURLOPT_URL, "ipecho.net/plain");
     curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, curl_memwrite);
     curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, &external_ip);
@@ -78,7 +78,7 @@ char *get_local_ip(void)
 {
     struct ifaddrs *ifaddr, *ifa;
     int s;
-    char *local_ip = malloc(NI_MAXHOST); // 1025
+    char *local_ip = malloc(NI_MAXHOST); /* 1025 */
 
     if (getifaddrs(&ifaddr) == -1) {
         perror("getifaddrs");
@@ -136,7 +136,7 @@ void runserver(void)
     int sockfd, rc, reuse, len;
     char buf[BUFLEN + 1];
     char *external_ip, *local_ip, *walk, *next, *read, *err = NULL;
-    char *xl, *dl, *tr;
+    char *xl, *dl;
     size_t read_len;
     struct params magnet;
     struct sockaddr_in servaddr, cliaddr, ip;
@@ -146,7 +146,7 @@ void runserver(void)
     leveldb_readoptions_t *roptions;
     leveldb_writeoptions_t *woptions;
 
-    // zero and set server socket struct fields
+    /* zero and set server socket struct fields */
     bzero(&servaddr, slen);
     bzero(&cliaddr, slen);
     bzero(&ip, sizeof(ip));
@@ -157,7 +157,7 @@ void runserver(void)
     external_ip = get_external_ip();
     local_ip = get_local_ip();
 
-    // convert external IP to network IP
+    /* convert external IP to network IP */
     rc = inet_pton(AF_INET, external_ip, &ip.sin_addr.s_addr);
     if (rc <= 0) die("Cannot convert network IP");
 
@@ -165,20 +165,20 @@ void runserver(void)
     debug("External IP: %s (%x)\n", external_ip, ntohl(ip.sin_addr.s_addr));
     debug("Local IP:    %s\n", local_ip);
 
-    // create UDP socket
+    /* create UDP socket */
     sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (sockfd < 0) die("Unable to create socket");
 
-    // set socket to reusable
+    /* set socket to reusable */
     reuse = 1;
     rc = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof reuse);
     if (rc < 0) die("Cannot set socket to reuse");
 
-    // bind socket to address
+    /* bind socket to address */
     rc = bind(sockfd, (struct sockaddr *)&servaddr, slen);
     if (rc < 0) die("Failed to bind socket");
 
-    // create the db if it doesn't exist already
+    /* create the db if it doesn't exist already */
     options = leveldb_options_create();
     roptions = leveldb_readoptions_create();
     woptions = leveldb_writeoptions_create();
@@ -189,9 +189,9 @@ void runserver(void)
             die("recvfrom failed");
         
         debug("Receive packet from %s:%d\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port));
-        // debug("Data: %s\n\n", buf);
+        /* debug("Data: %s\n\n", buf); */
 
-        // parse the magnet link and get infohash
+        /* parse the magnet link and get infohash */
         if (!(walk = strstr(buf, "btih:"))) {
             debug(" - Skip: infohash not found\n");
             continue;
@@ -200,7 +200,7 @@ void runserver(void)
         debug(" - BT infohash: %s\n", magnet.hash);
         walk += HASHLEN + 5;
 
-        // extract the remaining link parameters
+        /* extract the remaining link parameters */
         len = (int)strlen(buf);
         magnet.num_tr = 0;
         while ( (walk = strstr(walk, "&"))) {
@@ -209,22 +209,22 @@ void runserver(void)
             len = (next) ? next - walk : (int)strlen(buf) - len;
             if (walk[0] == 'd' && walk[1] == 'n') {
                 magnet.dn = _substr(walk, 3, len);
-                debug(" - dn:    %s\n", magnet.dn);
+                debug(" - dn: %s\n", magnet.dn);
             } else if (walk[0] == 'x' && walk[1] == 'l') {
                 xl = _substr(walk, 3, len);
                 magnet.xl = atoi(xl);
-                debug(" - xl:    %d\n", magnet.xl);
+                debug(" - xl: %d\n", magnet.xl);
             } else if (walk[0] == 'd' && walk[1] == 'l') {
                 dl = _substr(walk, 3, len);
                 magnet.dl = atoi(dl);
-                debug(" - dl:    %d\n", magnet.dl);
+                debug(" - dl: %d\n", magnet.dl);
             } else if (walk[0] == 't' && walk[1] == 'r') {
                 magnet.tr[magnet.num_tr++] = _substr(walk, 3, len);
                 debug(" - tr[%d]: %s\n", magnet.num_tr - 1, magnet.tr[magnet.num_tr - 1]);
             }
         }
 
-        // check if the hash exists already
+        /* check if the hash exists already */
         db = leveldb_open(options, DB, &err);
         if (err != NULL) {
             leveldb_free(err);
@@ -237,8 +237,8 @@ void runserver(void)
             die("Database read failed");
         }
 
-        // write the hash to the database, unless the hash is already in the
-        // database, and the stored link is identical to the new link
+        /* write the hash to the database, unless the hash is already in the
+           database, and the stored link is identical to the new link */
         if (read && !strncmp(buf, read, BUFLEN)) {
             debug(" - Skip: link already in database\n");
         } else {
@@ -254,43 +254,37 @@ void runserver(void)
         leveldb_close(db);
     }
 
-    check(close(sockfd) != -1);
+    if (close(sockfd) == -1) exit(1);
 
     free(external_ip);
     free(local_ip);
     exit(0);
-
-error:
-    free(external_ip);
-    free(local_ip);
-    exit(1);
 }
 
-void ping(const char *input_ip)
+void share(const char *ip)
 {
     int sockfd, rc, remain = BUFLEN;
     char buf[BUFLEN], *bufptr;
     struct sockaddr_in servaddr;
     const socklen_t slen = sizeof servaddr;
 
-    // example magnet link for testing
+    /* example magnet link for testing */
     const char *magnet = "magnet:?xt=urn:btih:a89be40ce171a21442003090b5de9d177a474951&dn=Death+by+Food+Pyramid+-+How+Shoddy+Science%2C+Sketchy+Politics+And+Shady+Special+Interests+Have+Ruined+Our+Health+%28epub%2Cmobi%2Cazw3%29+Gooner&xl=15844183&dl=15844183&tr=udp://tracker.openbittorrent.com:80/announce&tr=udp://tracker.istole.it:80/announce&tr=udp://tracker.publicbt.com:80/announce&tr=udp://12.rarbg.me:80/announce";
 
-    // zero and populate sockaddr_in fields
+    /* zero and populate sockaddr_in fields */
     bzero(&servaddr, slen);
     servaddr.sin_family = AF_INET;
     servaddr.sin_port = htons(PORT);
     
-    // convert input_ip to network address
-    // rc = inet_pton(AF_INET, node[0], &servaddr.sin_addr);
-    rc = inet_pton(AF_INET, input_ip, &servaddr.sin_addr);
+    /* convert ip to network address */
+    rc = inet_pton(AF_INET, ip, &servaddr.sin_addr);
     if (rc <= 0) die("Cannot convert network IP");
 
-    // create UDP socket
+    /* create UDP socket */
     sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (sockfd < 0) die("Unable to create socket");
 
-    // send magnet link
+    /* send magnet link */
     strlcpy(buf, magnet, BUFLEN);
     bufptr = (char *)&buf;
     while (remain > 0) {
@@ -300,17 +294,25 @@ void ping(const char *input_ip)
         bufptr += rc;
     }
 
-    if (close(sockfd) == -1) die("Unable to close socket");
+    if (close(sockfd) == -1) exit(1);
+}
+
+int sync(void)
+{
+    debug("Network sync\n");
+    /*share(node[0]);*/
+    return 1;
 }
 
 int main(int argc, char *argv[])
 {
     switch (argc) {
         case 1:
+            if (!sync()) die("sync error");
             runserver();
             break;
         case 2:
-            ping(argv[1]);
+            share(argv[1]);
             break;
         default: {
             leveldb_t *db;

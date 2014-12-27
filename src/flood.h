@@ -24,6 +24,10 @@
 extern "C" {
 #endif
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -46,6 +50,7 @@ extern "C" {
 
 #define HASHLEN 41
 #define BUFLEN 4096
+#define MAXTR 100
 #define PORT 9876
 #define DB "links"
 
@@ -53,6 +58,12 @@ extern "C" {
 #define RETRY 0
 #else
 #define RETRY 1
+#endif
+
+#ifdef NDEBUG
+#define debug(format, args...) ((void)0)
+#else
+#define debug printf
 #endif
 
 #define loop for (;;)
