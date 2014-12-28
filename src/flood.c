@@ -262,11 +262,36 @@ void share(const char *ip)
 {
     int sockfd, rc, remain = BUFLEN;
     char buf[BUFLEN], *bufptr;
+    char *err = NULL;
     struct sockaddr_in servaddr;
     const socklen_t slen = sizeof servaddr;
+    leveldb_readoptions_t *roptions;
+    leveldb_iterator_t* iter;
 
-    /* example magnet link for testing */
-    const char *magnet = "magnet:?xt=urn:btih:a89be40ce171a21442003090b5de9d177a474951&dn=Death+by+Food+Pyramid+-+How+Shoddy+Science%2C+Sketchy+Politics+And+Shady+Special+Interests+Have+Ruined+Our+Health+%28epub%2Cmobi%2Cazw3%29+Gooner&xl=15844183&dl=15844183&tr=udp://tracker.openbittorrent.com:80/announce&tr=udp://tracker.istole.it:80/announce&tr=udp://tracker.publicbt.com:80/announce&tr=udp://12.rarbg.me:80/announce";
+    leveldb_t *db;
+    leveldb_options_t *options;
+    leveldb_writeoptions_t *woptions;
+    char *read;
+    size_t read_len;
+
+    options = leveldb_options_create();
+    leveldb_options_set_create_if_missing(options, 1);
+
+    db = leveldb_open(options, DB, &err);
+    if (err != NULL) die("Could not open LevelDB");
+    leveldb_free(err);
+    err = NULL;
+
+    roptions = leveldb_readoptions_create();
+    iter = leveldb_create_iterator(db, roptions);
+
+    leveldb_iter_seek_to_first(iter);
+
+    size_t hashlen = HASHLEN;
+    size_t valuelen = LINKBUF;
+
+    char *hash;
+    char *magnet;
 
     /* zero and populate sockaddr_in fields */
     bzero(&servaddr, slen);
@@ -281,22 +306,33 @@ void share(const char *ip)
     sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (sockfd < 0) die("Unable to create socket");
 
-    /* send magnet link */
-    strlcpy(buf, magnet, BUFLEN);
-    bufptr = (char *)&buf;
-    while (remain > 0) {
-        rc = sendto(sockfd, bufptr, remain, 0, (struct sockaddr *)&servaddr, slen);
-        if (rc == -1) die("Failed to send link");
-        remain -= rc;
-        bufptr += rc;
-    }
+    do {
+        hash = (char *)leveldb_iter_key(iter, &hashlen);
+        magnet = (char *)leveldb_iter_value(iter, &valuelen);
 
+        debug("sharing hash: %s\n", hash);
+
+        /* send magnet link */
+        strlcpy(buf, magnet, BUFLEN);
+        bufptr = (char *)&buf;
+        while (remain > 0) {
+            rc = sendto(sockfd, bufptr, remain, 0, (struct sockaddr *)&servaddr, slen);
+            if (rc == -1) die("Failed to send link");
+            remain -= rc;
+            bufptr += rc;
+        }
+
+        leveldb_iter_next(iter);
+
+    } while (leveldb_iter_valid(iter));
+
+    leveldb_close(db);
     if (close(sockfd) == -1) exit(1);
 }
 
 int netsync(void)
 {
-    debug("Network sync\n");
+    debug("Sync with network...\n");
     share(node[0]);
     return 1;
 }
