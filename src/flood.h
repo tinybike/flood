@@ -24,10 +24,6 @@
 extern "C" {
 #endif
 
-#ifndef _GNU_SOURCE
-#define _GNU_SOURCE
-#endif
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -48,7 +44,6 @@ extern "C" {
 
 #define HASHLEN 41
 #define BUFLEN 4096
-#define LINKBUF 10000
 #define MAXTR 100
 #define PORT 9876
 #define DB "links"

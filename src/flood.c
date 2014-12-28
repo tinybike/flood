@@ -142,7 +142,7 @@ void runserver(void)
 
     int sockfd, rc, reuse, len;
     char buf[BUFLEN + 1];
-    char *external_ip, *local_ip, *walk, *next, *read, *err = NULL;
+    char *external_ip, *local_ip, *walk, *next, *read, *err;
     char *xl, *dl;
     size_t read_len;
     struct params magnet;
@@ -152,6 +152,8 @@ void runserver(void)
     leveldb_options_t *options;
     leveldb_readoptions_t *roptions;
     leveldb_writeoptions_t *woptions;
+
+    err = NULL;
 
     /* zero and set server socket struct fields */
     bzero(&servaddr, slen);
@@ -355,13 +357,16 @@ void synchronize(void)
 {
     debug("Sync with network...\n");
 
-    int num_seeds = 1;
+    int num_seeds;
+    num_seeds = 1;
+
     int i;
     for (i = 0; i < num_seeds; i++)
     {
         debug("Seed: %s\n", seeds[0]);
+        const char *external_ip;
 
-        const char *external_ip = get_external_ip();
+        external_ip = get_external_ip();
         
         if (strncmp(external_ip, seeds[0], strlen(seeds[0]))) {
             share(seeds[0]);

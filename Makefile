@@ -5,7 +5,7 @@ PACKAGE = flood-$(VERSION)
 
 PREFIX ?= /usr/local
 
-CFLAGS = -std=c99 -O2 -g -Wall -pthread -rdynamic -pedantic -Wextra -Isrc $(OPTFLAGS)
+CFLAGS = -std=gnu89 -O2 -g -Wall -pthread -rdynamic -Werror -Wextra -Isrc $(OPTFLAGS)
 LIBS = -ldl -lm -lcurl -lleveldb -lsnappy $(OPTLIBS)
 
 CLEANFILES = core core.* *.core *.o *.out src/*.o

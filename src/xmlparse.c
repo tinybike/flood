@@ -8,7 +8,8 @@
 #include <libxml/xmlreader.h>
 #include <leveldb/c.h>
 
-static void stream_file(const char *filename, leveldb_t *db) {
+static void stream_file(const char *filename, leveldb_t *db)
+{
     const xmlChar *value, *next_name;
     xmlTextReaderPtr reader;
     int ret;
@@ -74,7 +75,8 @@ static void stream_file(const char *filename, leveldb_t *db) {
     }
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
     if (argc != 2) return 1;
 
     leveldb_t *db;
