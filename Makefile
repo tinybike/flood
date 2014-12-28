@@ -1,7 +1,14 @@
-CC=gcc
-CFLAGS=-std=c89 -O2 -g -Wall -Wextra -rdynamic -pthread -pedantic -Isrc $(OPTFLAGS)
-LIBS=-ldl -lm -lcurl -lleveldb -lsnappy $(OPTLIBS)
-CLEANFILES=core core.* *.core *.o *.out src/*.o
+CC ?= gcc
+
+VERSION = 0.1
+PACKAGE = flood-$(VERSION)
+
+PREFIX ?= /usr/local
+
+CFLAGS = -std=c89 -O2 -g -Wall -Werror -Wextra -pthread -rdynamic -pedantic -Isrc $(OPTFLAGS)
+LIBS = -ldl -lm -lcurl -lleveldb -lsnappy $(OPTLIBS)
+
+CLEANFILES = core core.* *.core *.o *.out src/*.o
 
 all: flood
 
@@ -12,6 +19,13 @@ clean:
 	$(RM) -Rf flood $(CLEANFILES)
 
 install:
-	install flood /usr/local/bin
+	install flood $(PREFIX)/bin
 
-.PHONY: all clean install
+dist: all | $(PACKAGE)
+	cp -R src LICENSE Makefile README.md $(PACKAGE)
+	tar -czf $(PACKAGE).tar.gz $(PACKAGE)
+
+$(PACKAGE):
+	mkdir -p $(PACKAGE)
+
+.PHONY: all clean install dist

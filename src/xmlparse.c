@@ -1,4 +1,7 @@
-// gcc xml2leveldb.c -lxml2 -lsnappy -lleveldb -I/usr/include/libxml2 -o xml2leveldb
+/**
+ * gcc src/xmlparse.c -lxml2 -lsnappy -lleveldb -I/usr/include/libxml2 -o xmlparse
+ * ./xmlparse data/test2.xml-clean
+ */
 
 #include <stdio.h>
 #include <string.h>
@@ -41,11 +44,7 @@ static void stream_file(const char *filename, leveldb_t *db) {
                     strcpy(hash, (char *)value);
                 } else if (!strcmp("id", name)) {
                     if (strcmp("", magnet)) {
-                        printf("%s\n", magnet);
-                        int magnetlen = (int)strlen(magnet);
-                        char towrite[magnetlen];
-                        strcpy(towrite, magnet);
-                        leveldb_put(db, woptions, hash, 41, towrite, magnetlen, &err);
+                        leveldb_put(db, woptions, hash, 41, magnet, (int)strlen(magnet), &err);
                         if (err != NULL) {
                             fprintf(stderr, "Write fail.\n");
                             exit(1);
@@ -56,14 +55,8 @@ static void stream_file(const char *filename, leveldb_t *db) {
                 }
             }
             ret = xmlTextReaderRead(reader);
-            if (ret != 1) {
-                if (name != NULL && (value == NULL || *value == '\0' || !*value)) {
-                    exit(1);
-                }
-            }
         }
-        if (magnet && strcmp("", magnet) && strcmp("magnet:?", magnet)) {
-            printf("%s\n", magnet);
+        if (strcmp("", magnet) && strcmp("magnet:?", magnet)) {
             leveldb_put(db, woptions, hash, 41, magnet, (int)strlen(magnet), &err);
             if (err != NULL) {
                 fprintf(stderr, "Write fail.\n");

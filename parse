@@ -1,0 +1,63 @@
+#!/bin/bash
+set -e
+trap "exit" INT
+OPTIND=1
+
+installdeps=0
+xmlfile="0"
+tags=0
+
+# If passed -d flag, download dependencies
+while getopts "f:dt" opt; do
+    case "$opt" in
+        f)  xmlfile=$OPTARG
+            ;;
+        d)  installdeps=1
+            ;;
+        t)  tags=1
+            ;;
+    esac
+done
+
+shift $((OPTIND-1))
+[ "$1" = "--" ] && shift
+
+if [ "$xmlfile" != "0" ]; then
+    echo "Parsing XML..."
+fi
+
+if [ -f "xmlparse" ]; then
+    rm xmlparse 2>&1
+fi
+
+if [ $installdeps -eq 1 ]; then
+    echo " - Install dependencies"
+    sudo apt-get install libleveldb-dev libsnappy-dev libcurl-dev libxml2-dev 2>&1
+fi
+
+if [ "$xmlfile" != "0" ]; then
+    echo " - Compile xmlparse"
+fi
+gcc src/xmlparse.c -lxml2 -lsnappy -lleveldb -I/usr/include/libxml2 -o xmlparse 2>&1
+
+if [ $tags -eq 1 ]; then
+    if [ $installdeps -eq 1 ]; then
+        echo " - Install perl"
+        sudo apt-get install perl
+    fi
+    echo " - Add outer brackets"
+    echo "<outerbrackets>" > temp.txt
+    cat temp.txt $1 > $1.new
+    echo "</outerbrackets>" >> $1.new
+    rm temp.txt
+    perl -p -i -e 's/&/and/g' $1.new
+    tr -cd '\11\12\15\40-\176' < $1.new > $1
+    rm $1.new
+fi
+
+if [ "$xmlfile" != "0" ]; then
+    echo " - Parse $xmlfile"
+    ./xmlparse $xmlfile 2>&1
+    echo " - Remove xmlparse"
+    rm xmlparse
+fi

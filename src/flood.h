@@ -46,8 +46,6 @@ extern "C" {
 #include <sys/socket.h>
 #include <leveldb/c.h>
 
-#include "dbg.h"
-
 #define HASHLEN 41
 #define BUFLEN 4096
 #define MAXTR 100

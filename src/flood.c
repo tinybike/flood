@@ -17,11 +17,8 @@
  * License along with Flood. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "flood.h"
+/* #include "Cello.h" */
 
 static const char *node[] = { "69.164.196.239" };
 
@@ -44,10 +41,10 @@ void die(const char *message)
     exit(1);
 }
 
-static size_t curl_memwrite(void *data, size_t size, size_t n, void *userp)
+static size_t curl_memwrite(void *buf, size_t size, size_t n, void *userp)
 {
     char **response =  (char **)userp;
-    *response = strndup(data, (size_t)(size * n));
+    *response = strndup(buf, (size_t)(size * n));
     return (size_t)(size * n);
 }
 
@@ -297,10 +294,10 @@ void share(const char *ip)
     if (close(sockfd) == -1) exit(1);
 }
 
-int sync(void)
+int netsync(void)
 {
     debug("Network sync\n");
-    /*share(node[0]);*/
+    share(node[0]);
     return 1;
 }
 
@@ -308,7 +305,7 @@ int main(int argc, char *argv[])
 {
     switch (argc) {
         case 1:
-            if (!sync()) die("sync error");
+            if (!netsync()) die("sync error");
             runserver();
             break;
         case 2:
@@ -372,7 +369,3 @@ int main(int argc, char *argv[])
     }
     return 0;
 }
-
-#ifdef __cplusplus
-}
-#endif
