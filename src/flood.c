@@ -333,7 +333,10 @@ void share(const char *ip)
 int netsync(void)
 {
     debug("Sync with network...\n");
-    share(node[0]);
+    const char *external_ip = get_external_ip();
+    if (strncmp(external_ip, node[0], strlen(node[0]))) {
+        share(node[0]);
+    }
     return 1;
 }
 
