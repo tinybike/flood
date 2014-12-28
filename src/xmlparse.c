@@ -21,7 +21,8 @@ static void stream_file(const char *filename, leveldb_t *db) {
     reader = xmlReaderForFile(filename, NULL, 0);
     if (reader != NULL) {
         ret = xmlTextReaderRead(reader);
-        while (ret == 1) {
+        while (ret == 1)
+        {
             next_name = xmlTextReaderConstName(reader);
             if (next_name != NULL && strcmp("#text", (char *)next_name)) {
                 strcpy(name, (char *)next_name);

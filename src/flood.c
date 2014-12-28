@@ -18,9 +18,13 @@
  */
 
 #include "flood.h"
-/* #include "Cello.h" */
 
-static const char *node[] = { "69.164.196.239" };
+static const char *seeds[] = { "69.164.196.239" };
+
+struct node {
+    const char *ip;
+    struct node *next;
+};
 
 struct params {
     int num_tr;
@@ -75,19 +79,23 @@ char *get_local_ip(void)
 {
     struct ifaddrs *ifaddr, *ifa;
     int s;
-    char *local_ip = malloc(NI_MAXHOST); /* 1025 */
+    char *local_ip = malloc(NI_MAXHOST);
 
     if (getifaddrs(&ifaddr) == -1) {
         perror("getifaddrs");
         exit(1);
     }
-
-    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
+    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next)
+    {
         if (ifa->ifa_addr == NULL) continue;
-
-        s = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), local_ip, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
-
-        if ((strcmp(ifa->ifa_name, "wlan0") == 0) && (ifa->ifa_addr->sa_family == AF_INET)) {
+        s = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in),
+                                       local_ip,
+                                       NI_MAXHOST,
+                                       NULL,
+                                       0,
+                                       NI_NUMERICHOST);
+        if ((strcmp(ifa->ifa_name, "wlan0") == 0) &&
+            (ifa->ifa_addr->sa_family == AF_INET)) {
             if (s != 0) {
                 debug("getnameinfo() failed: %s\n", gai_strerror(s));
                 exit(1);
@@ -130,13 +138,15 @@ char *_substr(const char *string, int pos, int len)
 
 void runserver(void)
 {
+    debug("Start server...\n");
+
     int sockfd, rc, reuse, len;
     char buf[BUFLEN + 1];
     char *external_ip, *local_ip, *walk, *next, *read, *err = NULL;
     char *xl, *dl;
     size_t read_len;
     struct params magnet;
-    struct sockaddr_in servaddr, cliaddr, ip;
+    struct sockaddr_in servaddr, cliaddr;
     socklen_t slen = sizeof servaddr;
     leveldb_t *db;
     leveldb_options_t *options;
@@ -146,7 +156,6 @@ void runserver(void)
     /* zero and set server socket struct fields */
     bzero(&servaddr, slen);
     bzero(&cliaddr, slen);
-    bzero(&ip, sizeof(ip));
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     servaddr.sin_port = htons(PORT);
@@ -154,13 +163,8 @@ void runserver(void)
     external_ip = get_external_ip();
     local_ip = get_local_ip();
 
-    /* convert external IP to network IP */
-    rc = inet_pton(AF_INET, external_ip, &ip.sin_addr.s_addr);
-    if (rc <= 0) die("Cannot convert network IP");
-
-    debug("Seed:        %s\n", node[0]);
-    debug("External IP: %s (%x)\n", external_ip, ntohl(ip.sin_addr.s_addr));
-    debug("Local IP:    %s\n", local_ip);
+    debug(" - External IP: %s\n", external_ip);
+    debug(" - Local IP:    %s\n", local_ip);
 
     /* create UDP socket */
     sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -181,12 +185,13 @@ void runserver(void)
     woptions = leveldb_writeoptions_create();
     leveldb_options_set_create_if_missing(options, 1);
 
-    loop {
-        if (recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *)&cliaddr, &slen) == -1)
-            die("recvfrom failed");
+    loop
+    {
+        rc = recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *)&cliaddr, &slen);
+        if (rc == -1) die("recvfrom failed");
         
-        debug("Receive packet from %s:%d\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port));
-        /* debug("Data: %s\n\n", buf); */
+        debug("Receive packet from %s:%d\n", inet_ntoa(cliaddr.sin_addr),
+                                             ntohs(cliaddr.sin_port));
 
         /* parse the magnet link and get infohash */
         if (!(walk = strstr(buf, "btih:"))) {
@@ -200,7 +205,8 @@ void runserver(void)
         /* extract the remaining link parameters */
         len = (int)strlen(buf);
         magnet.num_tr = 0;
-        while ( (walk = strstr(walk, "&"))) {
+        while ( (walk = strstr(walk, "&")))
+        {
             walk++;
             next = strstr(walk, "&");
             len = (next) ? next - walk : (int)strlen(buf) - len;
@@ -217,7 +223,8 @@ void runserver(void)
                 debug(" - dl: %d\n", magnet.dl);
             } else if (walk[0] == 't' && walk[1] == 'r') {
                 magnet.tr[magnet.num_tr++] = _substr(walk, 3, len);
-                debug(" - tr[%d]: %s\n", magnet.num_tr - 1, magnet.tr[magnet.num_tr - 1]);
+                debug(" - tr[%d]: %s\n", magnet.num_tr - 1,
+                                         magnet.tr[magnet.num_tr - 1]);
             }
         }
 
@@ -260,38 +267,29 @@ void runserver(void)
 
 void share(const char *ip)
 {
-    int sockfd, rc, remain = BUFLEN;
-    char buf[BUFLEN], *bufptr;
-    char *err = NULL;
+    int sockfd, rc, remain;
+    char buf[BUFLEN], *bufptr, *err;
+    const char *hash, *magnet;
+    size_t readlen;
+    size_t hashlen = HASHLEN;
+    struct node *root;
+    struct node *peer;
     struct sockaddr_in servaddr;
     const socklen_t slen = sizeof servaddr;
+    leveldb_t *db;
+    leveldb_options_t *options;
     leveldb_readoptions_t *roptions;
     leveldb_iterator_t* iter;
 
-    leveldb_t *db;
-    leveldb_options_t *options;
-    leveldb_writeoptions_t *woptions;
-    char *read;
-    size_t read_len;
-
+    err = NULL;
     options = leveldb_options_create();
+    roptions = leveldb_readoptions_create();
     leveldb_options_set_create_if_missing(options, 1);
 
     db = leveldb_open(options, DB, &err);
     if (err != NULL) die("Could not open LevelDB");
     leveldb_free(err);
     err = NULL;
-
-    roptions = leveldb_readoptions_create();
-    iter = leveldb_create_iterator(db, roptions);
-
-    leveldb_iter_seek_to_first(iter);
-
-    size_t hashlen = HASHLEN;
-    size_t valuelen = LINKBUF;
-
-    char *hash;
-    char *magnet;
 
     /* zero and populate sockaddr_in fields */
     bzero(&servaddr, slen);
@@ -306,11 +304,18 @@ void share(const char *ip)
     sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
     if (sockfd < 0) die("Unable to create socket");
 
-    do {
-        hash = (char *)leveldb_iter_key(iter, &hashlen);
-        magnet = (char *)leveldb_iter_value(iter, &valuelen);
+    iter = leveldb_create_iterator(db, roptions);
 
-        debug("sharing hash: %s\n", hash);
+    /* send links to node */
+    leveldb_iter_seek_to_first(iter);
+
+    while (leveldb_iter_valid(iter))
+    {
+        remain = BUFLEN;
+        hash = leveldb_iter_key(iter, &hashlen);
+        magnet = leveldb_iter_value(iter, &readlen);
+
+        debug(" -> %s\n", hash);
 
         /* send magnet link */
         strlcpy(buf, magnet, BUFLEN);
@@ -323,34 +328,61 @@ void share(const char *ip)
         }
 
         leveldb_iter_next(iter);
+    }
 
-    } while (leveldb_iter_valid(iter));
+    /* receive links from node */
 
+    /* receive peers from node */
+    root = malloc(sizeof(struct node));
+    root->next = 0;
+    root->ip = "127.0.0.1";
+    peer = root;
+    if (peer != 0) {
+        while (peer->next != 0)
+        {
+            peer = peer->next;
+        }
+    }
+    free(peer);
+
+    leveldb_iter_destroy(iter);
     leveldb_close(db);
+
     if (close(sockfd) == -1) exit(1);
 }
 
-int netsync(void)
+void synchronize(void)
 {
     debug("Sync with network...\n");
-    const char *external_ip = get_external_ip();
-    if (strncmp(external_ip, node[0], strlen(node[0]))) {
-        share(node[0]);
+
+    int num_seeds = 1;
+    int i;
+    for (i = 0; i < num_seeds; i++)
+    {
+        debug("Seed: %s\n", seeds[0]);
+
+        const char *external_ip = get_external_ip();
+        
+        if (strncmp(external_ip, seeds[0], strlen(seeds[0]))) {
+            share(seeds[0]);
+        }
     }
-    return 1;
 }
 
 int main(int argc, char *argv[])
 {
     switch (argc) {
         case 1:
-            if (!netsync()) die("sync error");
+            /* normal mode: sync with network then broadcast */
+            synchronize();
             runserver();
             break;
         case 2:
+            /* share links with a specific node (IP address) */
             share(argv[1]);
             break;
         default: {
+            /* manual database I/O */
             leveldb_t *db;
             leveldb_options_t *options;
             leveldb_readoptions_t *roptions;
@@ -358,7 +390,6 @@ int main(int argc, char *argv[])
             char *err = NULL;
             char *read;
             size_t read_len;
-            char action = argv[2][0];
 
             options = leveldb_options_create();
             leveldb_options_set_create_if_missing(options, 1);
@@ -368,7 +399,7 @@ int main(int argc, char *argv[])
             leveldb_free(err);
             err = NULL;
 
-            switch (action) {
+            switch (argv[2][0]) {
                 case 'g': {
                     roptions = leveldb_readoptions_create();
 
