@@ -170,16 +170,16 @@ void runserver(void)
 
     /* create UDP socket */
     sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (sockfd < 0) die("Unable to create socket");
+    if (sockfd < 0) die("[runserver] Unable to create socket");
 
     /* set socket to reusable */
     reuse = 1;
     rc = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof reuse);
-    if (rc < 0) die("Cannot set socket to reuse");
+    if (rc < 0) die("[runserver] Cannot set socket to reuse");
 
     /* bind socket to address */
     rc = bind(sockfd, (struct sockaddr *)&servaddr, slen);
-    if (rc < 0) die("Failed to bind socket");
+    if (rc < 0) die("[runserver] Failed to bind socket");
 
     /* create the db if it doesn't exist already */
     options = leveldb_options_create();
@@ -190,7 +190,7 @@ void runserver(void)
     loop
     {
         rc = recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *)&cliaddr, &slen);
-        if (rc == -1) die("recvfrom failed");
+        if (rc == -1) die("[runserver] recvfrom failed");
         
         debug("Receive packet from %s:%d\n", inet_ntoa(cliaddr.sin_addr),
                                              ntohs(cliaddr.sin_port));
@@ -234,13 +234,13 @@ void runserver(void)
         db = leveldb_open(options, DB, &err);
         if (err != NULL) {
             leveldb_free(err);
-            die("Failed to open database");
+            die("[runserver] Failed to open database");
         }
         read = leveldb_get(db, roptions, magnet.hash, HASHLEN, &read_len, &err);
         if (err != NULL) {
             leveldb_free(err);
             leveldb_close(db);
-            die("Database read failed");
+            die("[runserver] Database read failed");
         }
 
         /* write the hash to the database, unless the hash is already in the
@@ -253,7 +253,7 @@ void runserver(void)
             if (err != NULL) {
                 leveldb_free(err);
                 leveldb_close(db);
-                die("Database write failed");
+                die("[runserver] Database write failed");
             }
         }
 
@@ -269,43 +269,58 @@ void runserver(void)
 
 void share(const char *ip)
 {
-    int sockfd, rc, remain;
+    int sockfd, rc, remain, reuse;
     char buf[BUFLEN], *bufptr, *err;
     const char *hash, *magnet;
     size_t readlen;
     size_t hashlen = HASHLEN;
     struct node *root;
     struct node *peer;
-    struct sockaddr_in servaddr;
+    struct sockaddr_in servaddr, xtrnaddr;
     const socklen_t slen = sizeof servaddr;
     leveldb_t *db;
     leveldb_options_t *options;
     leveldb_readoptions_t *roptions;
     leveldb_iterator_t* iter;
 
+    /* zero and populate sockaddr_in fields */
+    bzero(&servaddr, slen);
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    servaddr.sin_port = htons(PORT);
+
+    bzero(&xtrnaddr, slen);
+    xtrnaddr.sin_family = AF_INET;
+    xtrnaddr.sin_port = htons(PORT);
+
+    /* convert input ip to network address */
+    rc = inet_pton(AF_INET, ip, &xtrnaddr.sin_addr);
+    if (rc <= 0) die("[share] Cannot convert network IP");
+
+    /* create UDP socket */
+    sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (sockfd < 0) die("[share] Unable to create socket");
+
+    /* set socket to reusable */
+    reuse = 1;
+    rc = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof reuse);
+    if (rc < 0) die("[share] Cannot set socket to reuse");
+
+    /* bind socket to address */
+    rc = bind(sockfd, (struct sockaddr *)&servaddr, slen);
+    if (rc < 0) die("[share] Failed to bind socket");
+
+    /* open leveldb */
     err = NULL;
     options = leveldb_options_create();
     roptions = leveldb_readoptions_create();
     leveldb_options_set_create_if_missing(options, 1);
-
     db = leveldb_open(options, DB, &err);
-    if (err != NULL) die("Could not open LevelDB");
+    if (err != NULL) die("[share] Could not open LevelDB");
     leveldb_free(err);
     err = NULL;
 
-    /* zero and populate sockaddr_in fields */
-    bzero(&servaddr, slen);
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_port = htons(PORT);
-    
-    /* convert ip to network address */
-    rc = inet_pton(AF_INET, ip, &servaddr.sin_addr);
-    if (rc <= 0) die("Cannot convert network IP");
-
-    /* create UDP socket */
-    sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (sockfd < 0) die("Unable to create socket");
-
+    /* leveldb iterator */
     iter = leveldb_create_iterator(db, roptions);
 
     /* send links to node */
@@ -324,7 +339,7 @@ void share(const char *ip)
         bufptr = (char *)&buf;
         while (remain > 0) {
             rc = sendto(sockfd, bufptr, remain, 0, (struct sockaddr *)&servaddr, slen);
-            if (rc == -1) die("Failed to send link");
+            if (rc == -1) die("[share] Failed to send link");
             remain -= rc;
             bufptr += rc;
         }
