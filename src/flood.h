@@ -34,13 +34,16 @@ extern "C" {
 #include <netdb.h>
 #include <ifaddrs.h>
 #include <unistd.h>
-
 #include <curl/curl.h>
 #include <arpa/inet.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <leveldb/c.h>
+
+#ifdef __WIN32
+#include <winsock.h>
+#endif
 
 #define HASHLEN 41
 #define BUFLEN 4096
