@@ -401,7 +401,7 @@ void share(const char *ip)
 
     /* request links from node */
     debug("Request links:\n");
-    rc = sendto(sockfd, "r", 2, 0, (struct sockaddr *)&servaddr, sizeof servaddr);
+    rc = sendto(sockfd, "r", 2, 0, (struct sockaddr *)&xtrnaddr, sizeof xtrnaddr);
     if (rc == -1) die("[share] Link request failed");
 
     /* wait for incoming socket data, block until "transmission complete"
