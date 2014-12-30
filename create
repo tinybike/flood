@@ -9,5 +9,5 @@ sudo make install
 
 if [ "$1" == "reset" ]; then
     rm -Rf links
-    parse -f data/test2.xml-clean
+    ./parse -f data/test2.xml-clean
 fi
