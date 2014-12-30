@@ -192,12 +192,12 @@ int parselink(leveldb_t *db, char buf[BUFLEN - 1], const char* caller)
     /* check if the hash exists already */
     if (err != NULL) {
         leveldb_free(err);
-        debug("[share] Failed to open database\n");
+        debug("[%s] Failed to open database\n", caller);
     }
     read = leveldb_get(db, roptions, magnet.hash, HASHLEN, &readlen, &err);
     if (err != NULL) {
         leveldb_free(err);
-        debug("[share] Database read failed\n");
+        debug("[%s] Database read failed\n", caller);
     }
 
     /* write the hash to the database, unless the hash is already in the
@@ -209,7 +209,7 @@ int parselink(leveldb_t *db, char buf[BUFLEN - 1], const char* caller)
         leveldb_put(db, woptions, magnet.hash, HASHLEN, buf, BUFLEN, &err);
         if (err != NULL) {
             leveldb_free(err);
-            debug("[share] Database write failed\n");
+            debug("[%s] Database write failed\n", caller);
         }
     }
 
@@ -219,7 +219,7 @@ int parselink(leveldb_t *db, char buf[BUFLEN - 1], const char* caller)
 void runserver(void)
 {
     debug("Start server...\n");
-    const char *funcname = "runserver";
+    const char *_fn = "runserver";
 
     int sockfd, rc, remain, reuse, len;
     char buf[BUFLEN + 1];
@@ -256,7 +256,7 @@ void runserver(void)
     /* set socket to reusable */
     reuse = 1;
     rc = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof reuse);
-    if (rc < 0) die("[runserver] Cannot set socket to reuse");
+    if (rc < 0) debug("[%s] Cannot set socket to reuse\n", _fn);
 
     /* bind socket to address */
     rc = bind(sockfd, (struct sockaddr *)&servaddr, slen);
@@ -320,7 +320,7 @@ void runserver(void)
 
         debug("Receive packet from %s:%d\n", inet_ntoa(cliaddr.sin_addr),
                                              ntohs(cliaddr.sin_port));
-        parselink(db, buf, funcname);
+        parselink(db, buf, _fn);
     }
 
     leveldb_close(db);
@@ -333,7 +333,7 @@ void runserver(void)
 
 void share(const char *ip)
 {
-    const char *funcname = "share";
+    const char *_fn = "share";
 
     int sockfd, rc, remain, reuse, len;
     char buf[BUFLEN], *bufptr, *walk, *next, *read, *xl, *dl, *err = NULL;
@@ -433,7 +433,7 @@ void share(const char *ip)
             break;
         }
 
-        parselink(db, buf, funcname);
+        parselink(db, buf, _fn);
     }
 
     /* receive peers from node */
