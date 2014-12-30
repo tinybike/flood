@@ -197,9 +197,8 @@ void runserver(void)
         debug("Receive packet from %s:%d\n", inet_ntoa(cliaddr.sin_addr),
                                              ntohs(cliaddr.sin_port));
 
-        /* if this is a link request, fetch all links from
-           database and send to requestor */
-        if (!strcmp(buf, "r")) {
+        /* if this is a link request, send all links in database */
+        if (!strncmp(buf, "r", BUFLEN)) {
             debug(" - Link request\n");
             leveldb_iterator_t* iter;
 
@@ -236,7 +235,7 @@ void runserver(void)
                 leveldb_iter_next(iter);
             }
 
-            /* send "transmission complete" signal to requestor */
+            /* send "transmission complete" code */
             rc = sendto(sockfd, "c", 2, 0, (struct sockaddr *)&servaddr, slen);
             if (rc == -1) die("[runserver] transmission complete sendto failed");
             debug(" - Transmission complete\n");
@@ -286,13 +285,12 @@ void runserver(void)
         db = leveldb_open(options, DB, &err);
         if (err != NULL) {
             leveldb_free(err);
-            die("[runserver] Failed to open database");
+            debug("[runserver] Failed to open database\n");
         }
         read = leveldb_get(db, roptions, magnet.hash, HASHLEN, &readlen, &err);
         if (err != NULL) {
             leveldb_free(err);
-            leveldb_close(db);
-            die("[runserver] Database read failed");
+            debug("[runserver] Database read failed\n");
         }
 
         /* write the hash to the database, unless the hash is already in the
@@ -304,8 +302,7 @@ void runserver(void)
             leveldb_put(db, woptions, magnet.hash, HASHLEN, buf, BUFLEN, &err);
             if (err != NULL) {
                 leveldb_free(err);
-                leveldb_close(db);
-                die("[runserver] Database write failed");
+                debug("[runserver] Database write failed\n");
             }
         }
 
@@ -393,7 +390,7 @@ void share(const char *ip)
         bufptr = (char *)&buf;
         while (remain > 0) {
             rc = sendto(sockfd, bufptr, remain, 0, (struct sockaddr *)&xtrnaddr, sizeof xtrnaddr);
-            if (rc == -1) die("[share] sendto");
+            if (rc == -1) die("[share] Link share failed");
             debug(" - Sent %s to %s [%d bytes]\n", hash, inet_ntoa(xtrnaddr.sin_addr), rc);
             remain -= rc;
             bufptr += rc;
@@ -404,14 +401,14 @@ void share(const char *ip)
 
     /* request links from node */
     debug("Request links:\n");
-    rc = sendto(sockfd, "r", 2, 0, (struct sockaddr *)&servaddr, slen);
+    rc = sendto(sockfd, "r", 2, 0, (struct sockaddr *)&servaddr, sizeof servaddr);
     if (rc == -1) die("[share] Link request failed");
 
     /* wait for incoming socket data, block until "transmission complete"
        signal received from node (TODO use TCP for this?) */
     loop
     {
-        /* wait for incoming socket data */
+        /* wait for incoming socket data (TODO set timeout? set nonblocking?) */
         rc = recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *)&recvaddr, &slen);
         if (rc == -1) die("[share] recvfrom failed");
 
@@ -419,7 +416,7 @@ void share(const char *ip)
                                                 ntohs(recvaddr.sin_port));
 
         /* stop expecting links when transmission complete packet received */
-        if (!strcmp(buf, "c")) {
+        if (!strncmp(buf, "c", BUFLEN)) {
             debug(" - Transmission complete\n");
             break;
         }
@@ -468,7 +465,6 @@ void share(const char *ip)
         read = leveldb_get(db, roptions, magnet.hash, HASHLEN, &readlen, &err);
         if (err != NULL) {
             leveldb_free(err);
-            leveldb_close(db);
             debug("[share] Database read failed\n");
         }
 
@@ -481,7 +477,6 @@ void share(const char *ip)
             leveldb_put(db, woptions, magnet.hash, HASHLEN, buf, BUFLEN, &err);
             if (err != NULL) {
                 leveldb_free(err);
-                leveldb_close(db);
                 debug("[share] Database write failed\n");
             }
         }
