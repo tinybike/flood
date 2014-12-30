@@ -219,8 +219,7 @@ int parselink(leveldb_t *db, char buf[BUFLEN - 1], const char* caller)
 void runserver(void)
 {
     debug("Start server...\n");
-    debug("%s\n", __func__);
-    // if (!__FUNC__) const char *__func__ = "runserver";
+    const char *funcname = "runserver";
 
     int sockfd, rc, remain, reuse, len;
     char buf[BUFLEN + 1];
@@ -321,7 +320,7 @@ void runserver(void)
 
         debug("Receive packet from %s:%d\n", inet_ntoa(cliaddr.sin_addr),
                                              ntohs(cliaddr.sin_port));
-        parselink(db, buf, __func__);
+        parselink(db, buf, funcname);
     }
 
     leveldb_close(db);
@@ -334,8 +333,7 @@ void runserver(void)
 
 void share(const char *ip)
 {
-    debug("%s\n", __func__);
-    // if (!__FUNC__) const char *__func__ = "share";
+    const char *funcname = "share";
 
     int sockfd, rc, remain, reuse, len;
     char buf[BUFLEN], *bufptr, *walk, *next, *read, *xl, *dl, *err = NULL;
@@ -435,7 +433,7 @@ void share(const char *ip)
             break;
         }
 
-        parselink(db, buf, __func__);
+        parselink(db, buf, funcname);
     }
 
     /* receive peers from node */
