@@ -136,7 +136,7 @@ char *_substr(const char *string, int pos, int len)
     return substring;
 }
 
-int parselink(leveldb_t *db, const char *buf, const char* caller)
+int parselink(leveldb_t *db, char buf[BUFLEN - 1], const char* caller)
 {
     int sockfd, rc, remain, reuse, len;
     char *external_ip, *local_ip, *walk, *next, *read, *err, *bufptr;
