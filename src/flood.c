@@ -227,7 +227,7 @@ void runserver(void)
                 strlcpy(buf, link, BUFLEN);
                 bufptr = (char *)&buf;
                 while (remain > 0) {
-                    rc = sendto(sockfd, bufptr, remain, 0, (struct sockaddr *)&servaddr, slen);
+                    rc = sendto(sockfd, bufptr, remain, 0, (struct sockaddr *)&cliaddr, slen);
                     if (rc == -1) die("[runserver] Failed to send link");
                     remain -= rc;
                     bufptr += rc;
@@ -237,7 +237,7 @@ void runserver(void)
             }
 
             /* send "transmission complete" code */
-            rc = sendto(sockfd, "c", 2, 0, (struct sockaddr *)&servaddr, slen);
+            rc = sendto(sockfd, "c", 2, 0, (struct sockaddr *)&cliaddr, slen);
             if (rc == -1) die("[runserver] transmission complete sendto failed");
             debug(" - Transmission complete\n");
 
