@@ -288,12 +288,6 @@ void runserver(void)
             debug(" - Received link request\n");
             leveldb_iterator_t* iter;
 
-            /* open leveldb */
-            db = leveldb_open(options, DB, &err);
-            if (err != NULL) die("[runserver] Could not open LevelDB");
-            leveldb_free(err);
-            err = NULL;
-
             /* leveldb iterator */
             iter = leveldb_create_iterator(db, roptions);
 
@@ -327,7 +321,6 @@ void runserver(void)
             debug(" - Transmission complete\n");
 
             leveldb_iter_destroy(iter);
-            leveldb_close(db);
 
             continue;
         }
