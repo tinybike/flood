@@ -1,0 +1,13 @@
+CC ?= gcc
+CFLAGS = -O2 -g -Wall -Wno-unused -Isrc -std=gnu99 -I/usr/include/libxml2 $(OPTFLAGS)
+LIBS = -ldl -lm -lcurl -lxml2 -lleveldb -lsnappy $(OPTLIBS)
+
+all: xmlparse
+
+xmlparse: src/xmlparse.o
+	$(CC) $(CFLAGS) src/xmlparse.c -o src/xmlparse.o
+
+clean:
+	$(RM) xmlfile
+
+.PHONY: clean

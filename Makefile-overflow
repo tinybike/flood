@@ -1,0 +1,1 @@
+# CFLAGS = -Isrc -std=gnu99 -Wall -Werror -Wno-unused -pthread -O3 -g $(OPTFLAGS)

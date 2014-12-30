@@ -371,41 +371,8 @@ void share(const char *ip)
     /* leveldb iterator */
     iter = leveldb_create_iterator(db, roptions);
 
-    /* send links to node */
-    // debug(" - Send links\n");
-    // leveldb_iter_seek_to_first(iter);
-    // while (leveldb_iter_valid(iter))
-    // {
-    //     remain = BUFLEN;
-    //     hash = leveldb_iter_key(iter, &hashlen);
-    //     link = leveldb_iter_value(iter, &readlen);
-
-    //     debug(" -> %s\n", hash);
-
-    //     /* send magnet link */
-    //     strlcpy(buf, link, BUFLEN);
-    //     bufptr = (char *)&buf;
-    //     while (remain > 0) {
-    //         rc = sendto(sockfd, bufptr, remain, 0, (struct sockaddr *)&servaddr, slen);
-    //         if (rc == -1) die("[share] Failed to send link");
-    //         debug(" - Sent %s to %s [%d bytes]\n", hash, inet_ntoa(servaddr.sin_addr), rc);
-    //         remain -= rc;
-    //         bufptr += rc;
-    //     }
-
-    //     leveldb_iter_next(iter);
-    // }
-
-    /* broadcast links */
-    debug(" - Link broadcast\n");
-
-    // if ( (he = gethostbyname(ip)) == NULL) die("[share] gethostbyname");
-    // if ( (setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof broadcast) == -1))
-    //     die("[share] setsockopt(SO_BROADCAST)");
-
-    // their_addr.sin_family = AF_INET;
-    // their_addr.sin_port = htons(PORT);
-    // their_addr.sin_addr = *((struct in_addr *)he->h_addr);
+    /* send links */
+    debug(" - Send links\n");
 
     memset(xtrnaddr.sin_zero, '\0', sizeof xtrnaddr.sin_zero);
 
