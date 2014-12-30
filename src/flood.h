@@ -39,11 +39,14 @@ extern "C" {
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <leveldb/c.h>
 
 #ifdef __WIN32
 #include <winsock.h>
 #endif
+
+#include <leveldb/c.h>
+#include <libtorrent.h>
+#include <Cello.h>
 
 #define HASHLEN 41
 #define BUFLEN 4096

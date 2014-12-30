@@ -6,10 +6,10 @@ PACKAGE = flood-$(VERSION)
 PREFIX ?= /usr/local
 
 # CFLAGS = -std=gnu89 -O2 -g -Wall -pthread -rdynamic -Werror -Wextra -Isrc $(OPTFLAGS)
-CFLAGS = -std=gnu89 -O2 -g -Wall -pthread -rdynamic -Wno-unused -Isrc $(OPTFLAGS)
-LIBS = -ldl -lm -lcurl -lleveldb -lsnappy $(OPTLIBS)
+CFLAGS = -std=gnu99 -O2 -g -Wall -pthread -rdynamic -Wno-unused -Isrc $(OPTFLAGS)
+LIBS = -lCello -lm -ldl -lcurl -lleveldb -lsnappy $(OPTLIBS) -Llibtorrent
 
-CLEANFILES = core core.* *.core *.o *.out src/*.o
+CLEANFILES = core core.* *.core *.o *.out *.a src/*.o
 
 all: flood listener broadcaster
 
@@ -22,8 +22,12 @@ listener: src/listener.o
 broadcaster: src/broadcaster.o
 	$(CC) $(CFLAGS) -o $@ src/broadcaster.o $(LIBS)	
 
+libtorrent:
+	@$(MAKE) -C src/lt
+
 clean:
-	$(RM) -Rf flood listener broadcaster $(CLEANFILES)
+	$(RM) -f flood listener broadcaster $(CLEANFILES)
+	# @$(MAKE) clean -C src/lt
 
 install:
 	install flood $(PREFIX)/bin

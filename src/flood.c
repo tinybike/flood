@@ -338,8 +338,8 @@ void share(const char *ip)
     xtrnaddr.sin_port = htons(PORT);
 
     /* convert input ip to network address */
-    rc = inet_pton(AF_INET, ip, &xtrnaddr.sin_addr);
-    if (rc <= 0) die("[share] Cannot convert network IP");
+    // rc = inet_pton(AF_INET, ip, &xtrnaddr.sin_addr);
+    // if (rc <= 0) die("[share] Cannot convert network IP");
 
     /* create UDP socket */
     sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -398,9 +398,9 @@ void share(const char *ip)
     int numbytes;
     int broadcast = 1;
     
-    if ( (he = gethostbyname(ip)) == NULL) die("gethostbyname");
+    if ( (he = gethostbyname(ip)) == NULL) die("[share] gethostbyname");
     if ( (setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &broadcast, sizeof broadcast) == -1))
-        die("setsockopt(SO_BROADCAST)");
+        die("[share] setsockopt(SO_BROADCAST)");
     
     their_addr.sin_family = AF_INET;
     their_addr.sin_port = htons(PORT);
@@ -415,15 +415,13 @@ void share(const char *ip)
         hash = leveldb_iter_key(iter, &hashlen);
         link = leveldb_iter_value(iter, &readlen);
 
-        debug(" -> %s\n", hash);
-
         /* send magnet link */
         strlcpy(buf, link, BUFLEN);
         bufptr = (char *)&buf;
         while (remain > 0) {
             numbytes = sendto(sockfd, bufptr, remain, 0, (struct sockaddr *)&their_addr, sizeof their_addr);
-            if (numbytes == -1) die("sendto");
-            debug("sent %d bytes to %s\n", numbytes, inet_ntoa(their_addr.sin_addr));
+            if (numbytes == -1) die("[share] sendto");
+            debug(" - Sent %s to %s [%d bytes]\n", hash, inet_ntoa(their_addr.sin_addr), numbytes);
             remain -= numbytes;
             bufptr += numbytes;
         }
