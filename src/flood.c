@@ -276,21 +276,18 @@ void runserver(void)
         /* wait for incoming socket data */
         rc = recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *)&cliaddr, &slen);
         if (rc == -1) die("[runserver] recvfrom failed");
-        
-        debug("Receive packet from %s:%d\n", inet_ntoa(cliaddr.sin_addr),
-                                             ntohs(cliaddr.sin_port));
-        debug("Data: %s\n", buf);
+        /* debug("Data: %s\n", buf); */
 
         /* if this is a link request, send all links in database */
         if (!strncmp(buf, "r", BUFLEN)) {
-            debug(" - Received link request\n");
+            debug("Link request from %s:%d\n", inet_ntoa(cliaddr.sin_addr),
+                                               ntohs(cliaddr.sin_port));
             leveldb_iterator_t* iter;
 
             /* leveldb iterator */
             iter = leveldb_create_iterator(db, roptions);
 
             /* send links to node */
-            debug(" - Send links\n");
             leveldb_iter_seek_to_first(iter);
             while (leveldb_iter_valid(iter))
             {
@@ -298,14 +295,13 @@ void runserver(void)
                 hash = leveldb_iter_key(iter, &hashlen);
                 link = leveldb_iter_value(iter, &readlen);
 
-                debug(" -> %s\n", hash);
-
                 /* send magnet link */
                 strlcpy(buf, link, BUFLEN);
                 bufptr = (char *)&buf;
                 while (remain > 0) {
                     rc = sendto(sockfd, bufptr, remain, 0, (struct sockaddr *)&cliaddr, slen);
                     if (rc == -1) die("[runserver] Failed to send link");
+                    debug(" - Sent %s [%d bytes]\n", hash, rc);
                     remain -= rc;
                     bufptr += rc;
                 }
@@ -323,6 +319,8 @@ void runserver(void)
             continue;
         }
 
+        debug("Receive packet from %s:%d\n", inet_ntoa(cliaddr.sin_addr),
+                                             ntohs(cliaddr.sin_port));
         parselink(db, buf, __func__);
     }
 
