@@ -139,7 +139,7 @@ char *_substr(const char *string, int pos, int len)
 int parselink(leveldb_t *db, char buf[BUFLEN - 1], const char* caller)
 {
     int sockfd, rc, remain, reuse, len;
-    char *external_ip, *local_ip, *walk, *next, *read, *err, *bufptr;
+    char *external_ip, *local_ip, *walk, *next, *read, *bufptr, *err = NULL;
     char *xl, *dl;
     const char *hash, *link;
     size_t readlen;
@@ -150,8 +150,6 @@ int parselink(leveldb_t *db, char buf[BUFLEN - 1], const char* caller)
     leveldb_options_t *options;
     leveldb_readoptions_t *roptions;
     leveldb_writeoptions_t *woptions;
-
-    err = NULL;
 
     roptions = leveldb_readoptions_create();
     woptions = leveldb_writeoptions_create();
@@ -226,7 +224,7 @@ void runserver(void)
 
     int sockfd, rc, remain, reuse, len;
     char buf[BUFLEN + 1];
-    char *external_ip, *local_ip, *walk, *next, *read, *err, *bufptr;
+    char *external_ip, *local_ip, *walk, *next, *read, *bufptr, *err = NULL;
     char *xl, *dl;
     const char *hash, *link;
     size_t readlen;
@@ -266,8 +264,8 @@ void runserver(void)
     if (rc < 0) die("[runserver] Failed to bind socket");
 
     /* create the db if it doesn't exist already */
-    err = NULL;
     options = leveldb_options_create();
+    roptions = leveldb_readoptions_create();
     leveldb_options_set_create_if_missing(options, 1);
 
     /* open database */
@@ -342,7 +340,7 @@ void share(const char *ip)
     // if (!__FUNC__) const char *__func__ = "share";
 
     int sockfd, rc, remain, reuse, len;
-    char buf[BUFLEN], *bufptr, *err, *walk, *next, *read, *xl, *dl;
+    char buf[BUFLEN], *bufptr, *walk, *next, *read, *xl, *dl, *err = NULL;
     const char *hash, *link;
     size_t readlen;
     size_t hashlen = HASHLEN;
@@ -383,7 +381,6 @@ void share(const char *ip)
     if (rc < 0) die("[share] Cannot set socket to reuse");
 
     /* open leveldb */
-    err = NULL;
     options = leveldb_options_create();
     roptions = leveldb_readoptions_create();
     leveldb_options_set_create_if_missing(options, 1);
