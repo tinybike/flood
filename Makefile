@@ -11,7 +11,7 @@ LIBS = -lm -ldl -lcurl -lleveldb -lsnappy $(OPTLIBS)
 
 CLEANFILES = core core.* *.core *.o *.out *.a src/*.o
 
-all: flood listener broadcaster
+all: flood
 
 flood: src/flood.o
 	$(CC) $(CFLAGS) -o $@ src/flood.o $(LIBS)
@@ -26,7 +26,7 @@ libtorrent:
 	@$(MAKE) -C src/lt
 
 clean:
-	$(RM) -f flood listener broadcaster $(CLEANFILES)
+	$(RM) -f flood $(CLEANFILES)
 
 install:
 	install flood $(PREFIX)/bin
