@@ -45,8 +45,8 @@ extern "C" {
 #endif
 
 #include <leveldb/c.h>
-#include <libtorrent.h>
-#include <Cello.h>
+/*#include <libtorrent.h>
+#include <Cello.h>*/
 
 #define HASHLEN 41
 #define BUFLEN 4096

@@ -9,7 +9,7 @@ Requires cURL and LevelDB.  On Debian-based systems:
 
     $ apt-get install libcurl4-openssl-dev libsnappy-dev libleveldb-dev
     $ make
-    $ sudo make install
+    $ make install
 
 ## Usage
 
