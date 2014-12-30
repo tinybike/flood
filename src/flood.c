@@ -190,6 +190,7 @@ void runserver(void)
 
     loop
     {
+        /* wait for incoming socket data */
         rc = recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *)&cliaddr, &slen);
         if (rc == -1) die("[runserver] recvfrom failed");
         
@@ -198,46 +199,53 @@ void runserver(void)
 
         /* if this is a link request, fetch all links from
            database and send to requestor */
-        // if (!strcmp(buf, "r")) {
-        //     leveldb_iterator_t* iter;
+        if (!strcmp(buf, "r")) {
+            debug(" - Link request\n");
+            leveldb_iterator_t* iter;
 
-        //     /* open leveldb */
-        //     db = leveldb_open(options, DB, &err);
-        //     if (err != NULL) die("[share] Could not open LevelDB");
-        //     leveldb_free(err);
-        //     err = NULL;
+            /* open leveldb */
+            db = leveldb_open(options, DB, &err);
+            if (err != NULL) die("[runserver] Could not open LevelDB");
+            leveldb_free(err);
+            err = NULL;
 
-        //     /* leveldb iterator */
-        //     iter = leveldb_create_iterator(db, roptions);
+            /* leveldb iterator */
+            iter = leveldb_create_iterator(db, roptions);
 
-        //     /* send links to node */
-        //     leveldb_iter_seek_to_first(iter);
-        //     while (leveldb_iter_valid(iter))
-        //     {
-        //         remain = BUFLEN;
-        //         hash = leveldb_iter_key(iter, &hashlen);
-        //         link = leveldb_iter_value(iter, &readlen);
+            /* send links to node */
+            debug(" - Send links\n");
+            leveldb_iter_seek_to_first(iter);
+            while (leveldb_iter_valid(iter))
+            {
+                remain = BUFLEN;
+                hash = leveldb_iter_key(iter, &hashlen);
+                link = leveldb_iter_value(iter, &readlen);
 
-        //         debug(" -> %s\n", hash);
+                debug(" -> %s\n", hash);
 
-        //         /* send magnet link */
-        //         strlcpy(buf, link, BUFLEN);
-        //         bufptr = (char *)&buf;
-        //         while (remain > 0) {
-        //             rc = sendto(sockfd, bufptr, remain, 0, (struct sockaddr *)&servaddr, slen);
-        //             if (rc == -1) die("[share] Failed to send link");
-        //             remain -= rc;
-        //             bufptr += rc;
-        //         }
+                /* send magnet link */
+                strlcpy(buf, link, BUFLEN);
+                bufptr = (char *)&buf;
+                while (remain > 0) {
+                    rc = sendto(sockfd, bufptr, remain, 0, (struct sockaddr *)&servaddr, slen);
+                    if (rc == -1) die("[runserver] Failed to send link");
+                    remain -= rc;
+                    bufptr += rc;
+                }
 
-        //         leveldb_iter_next(iter);
-        //     }            
+                leveldb_iter_next(iter);
+            }
 
-        //     leveldb_iter_destroy(iter);
-        //     leveldb_close(db);
+            /* send "transmission complete" signal to requestor */
+            rc = sendto(sockfd, "c", 2, 0, (struct sockaddr *)&servaddr, slen);
+            if (rc == -1) die("[runserver] transmission complete sendto failed");
+            debug(" - Transmission complete\n");
 
-        //     continue;
-        // }
+            leveldb_iter_destroy(iter);
+            leveldb_close(db);
+
+            continue;
+        }
 
         /* parse the magnet link and get infohash */
         if (!(walk = strstr(buf, "btih:"))) {
@@ -313,23 +321,21 @@ void runserver(void)
 
 void share(const char *ip)
 {
-    int sockfd, rc, remain, reuse;
-    char buf[BUFLEN], *bufptr, *err;
+    int sockfd, rc, remain, reuse, len;
+    char buf[BUFLEN], *bufptr, *err, *walk, *next, *read, *xl, *dl;
     const char *hash, *link;
     size_t readlen;
     size_t hashlen = HASHLEN;
+    struct params magnet;
     struct node *root;
     struct node *peer;
-    struct sockaddr_in servaddr, xtrnaddr;
-    const socklen_t slen = sizeof servaddr;
+    struct sockaddr_in servaddr, xtrnaddr, recvaddr;
+    socklen_t slen = sizeof servaddr;
     leveldb_t *db;
     leveldb_options_t *options;
     leveldb_readoptions_t *roptions;
+    leveldb_writeoptions_t *woptions;
     leveldb_iterator_t* iter;
-
-    struct hostent *he;
-    int numbytes;
-    int broadcast = 1;
 
     /* zero and populate sockaddr_in fields */
     bzero(&servaddr, slen);
@@ -340,6 +346,8 @@ void share(const char *ip)
     bzero(&xtrnaddr, slen);
     xtrnaddr.sin_family = AF_INET;
     xtrnaddr.sin_port = htons(PORT);
+
+    bzero(&recvaddr, slen);
 
     /* convert input ip to network address */
     rc = inet_pton(AF_INET, ip, &xtrnaddr.sin_addr);
@@ -372,10 +380,7 @@ void share(const char *ip)
     iter = leveldb_create_iterator(db, roptions);
 
     /* send links */
-    debug(" - Send links\n");
-
-    memset(xtrnaddr.sin_zero, '\0', sizeof xtrnaddr.sin_zero);
-
+    debug("Share links:\n");
     leveldb_iter_seek_to_first(iter);
     while (leveldb_iter_valid(iter))
     {
@@ -397,15 +402,90 @@ void share(const char *ip)
         leveldb_iter_next(iter);
     }
 
-    /* receive links from node */
-    // debug(" - Receive links\n");
-    // rc = sendto(sockfd, "r", 2, 0, (struct sockaddr *)&servaddr, slen);
-    // if (rc == -1) die("[share] Link request failed");
-    // loop
-    // {
-    //     rc = recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *)&cliaddr, &slen);
-    //     if (rc == -1) die("[share] recvfrom failed");
-    // }
+    /* request links from node */
+    debug("Request links:\n");
+    rc = sendto(sockfd, "r", 2, 0, (struct sockaddr *)&servaddr, slen);
+    if (rc == -1) die("[share] Link request failed");
+
+    /* wait for incoming socket data, block until "transmission complete"
+       signal received from node (TODO use TCP for this?) */
+    loop
+    {
+        /* wait for incoming socket data */
+        rc = recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *)&recvaddr, &slen);
+        if (rc == -1) die("[share] recvfrom failed");
+
+        debug(" - Receive packet from %s:%d\n", inet_ntoa(recvaddr.sin_addr),
+                                                ntohs(recvaddr.sin_port));
+
+        /* stop expecting links when transmission complete packet received */
+        if (!strcmp(buf, "c")) {
+            debug(" - Transmission complete\n");
+            break;
+        }
+
+        /* parse the magnet link and get infohash */
+        if (!(walk = strstr(buf, "btih:"))) {
+            debug(" - Skip: infohash not found\n");
+            continue;
+        }
+        magnet.hash = _substr(walk, 5, HASHLEN - 1);
+        debug(" - BT infohash: %s\n", magnet.hash);
+        walk += HASHLEN + 5;
+
+        /* extract the remaining link parameters */
+        len = (int)strlen(buf);
+        magnet.num_tr = 0;
+        while ( (walk = strstr(walk, "&")))
+        {
+            walk++;
+            next = strstr(walk, "&");
+            len = (next) ? next - walk : (int)strlen(buf) - len;
+            if (walk[0] == 'd' && walk[1] == 'n') {
+                magnet.dn = _substr(walk, 3, len);
+                debug(" - dn: %s\n", magnet.dn);
+            } else if (walk[0] == 'x' && walk[1] == 'l') {
+                xl = _substr(walk, 3, len);
+                magnet.xl = atoi(xl);
+                debug(" - xl: %d\n", magnet.xl);
+            } else if (walk[0] == 'd' && walk[1] == 'l') {
+                dl = _substr(walk, 3, len);
+                magnet.dl = atoi(dl);
+                debug(" - dl: %d\n", magnet.dl);
+            } else if (walk[0] == 't' && walk[1] == 'r') {
+                magnet.tr[magnet.num_tr++] = _substr(walk, 3, len);
+                debug(" - tr[%d]: %s\n", magnet.num_tr - 1,
+                                         magnet.tr[magnet.num_tr - 1]);
+            }
+        }
+
+        /* check if the hash exists already */
+        db = leveldb_open(options, DB, &err);
+        if (err != NULL) {
+            leveldb_free(err);
+            debug("[share] Failed to open database\n");
+        }
+        read = leveldb_get(db, roptions, magnet.hash, HASHLEN, &readlen, &err);
+        if (err != NULL) {
+            leveldb_free(err);
+            leveldb_close(db);
+            debug("[share] Database read failed\n");
+        }
+
+        /* write the hash to the database, unless the hash is already in the
+           database, and the stored link is identical to the new link */
+        if (read && !strncmp(buf, read, BUFLEN)) {
+            debug(" - Skip: link already in database\n");
+        } else {
+            debug(" - Save link to database\n");
+            leveldb_put(db, woptions, magnet.hash, HASHLEN, buf, BUFLEN, &err);
+            if (err != NULL) {
+                leveldb_free(err);
+                leveldb_close(db);
+                debug("[share] Database write failed\n");
+            }
+        }
+    }
 
     /* receive peers from node */
     root = malloc(sizeof(struct node));

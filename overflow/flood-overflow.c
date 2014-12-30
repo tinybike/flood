@@ -53,3 +53,6 @@ while (leveldb_iter_valid(iter))
 
     leveldb_iter_next(iter);
 }
+
+
+memset(xtrnaddr.sin_zero, '\0', sizeof xtrnaddr.sin_zero);
