@@ -1,1 +1,13 @@
-make clean && make && sudo make install
+#!/bin/bash
+
+set -e
+trap "exit" INT
+
+make clean
+make
+sudo make install
+
+if [ "$1" == "reset" ]; then
+    rm -Rf links
+    parse -f data/test2.xml-clean
+fi

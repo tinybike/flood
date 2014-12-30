@@ -5,7 +5,8 @@ PACKAGE = flood-$(VERSION)
 
 PREFIX ?= /usr/local
 
-CFLAGS = -std=gnu89 -O2 -g -Wall -Wno-unused -pthread -rdynamic -Werror -Wextra -Isrc $(OPTFLAGS)
+# CFLAGS = -std=gnu89 -O2 -g -Wall -Wno-unused -pthread -rdynamic -Werror -Wextra -Isrc $(OPTFLAGS)
+CFLAGS = -std=gnu89 -O2 -g -Wno-unused -pthread -rdynamic -Isrc $(OPTFLAGS)
 LIBS = -lm -ldl -lcurl -lleveldb -lsnappy $(OPTLIBS)
 
 CLEANFILES = core core.* *.core *.o *.out *.a src/*.o
@@ -26,7 +27,6 @@ libtorrent:
 
 clean:
 	$(RM) -f flood listener broadcaster $(CLEANFILES)
-	# @$(MAKE) clean -C src/lt
 
 install:
 	install flood $(PREFIX)/bin
