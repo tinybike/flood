@@ -151,6 +151,8 @@ int parselink(leveldb_t *db, char buf[BUFLEN - 1], const char* caller)
     leveldb_readoptions_t *roptions;
     leveldb_writeoptions_t *woptions;
 
+    err = NULL;
+
     roptions = leveldb_readoptions_create();
     woptions = leveldb_writeoptions_create();
 
