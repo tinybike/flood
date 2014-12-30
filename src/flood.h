@@ -24,6 +24,19 @@
 extern "C" {
 #endif
 
+#if defined(__STDC__)
+# define C89
+# if defined(__STDC_VERSION__)
+#  define C90
+#  if (__STDC_VERSION__ >= 199409L)
+#   define C94
+#  endif
+#  if (__STDC_VERSION__ >= 199901L)
+#   define C99
+#  endif
+# endif
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -64,6 +77,12 @@ extern "C" {
 #define debug(format, args...) ((void)0)
 #else
 #define debug printf
+#endif
+
+#ifndef C99
+#define __FUNC__ 0
+#else
+#define __FUNC__ 1
 #endif
 
 #define loop for (;;)

@@ -18,6 +18,10 @@ debug("External IP: %s (%x)\n", external_ip, ntohl(ip.sin_addr.s_addr));
 
 debug("Data: %s\n\n", buf);
 
+/* bind socket to address */
+rc = bind(sockfd, (struct sockaddr *)&servaddr, slen);
+if (rc < 0) die("[share] Failed to bind socket");
+
 /* example magnet link for testing */
 const char *magnet = "magnet:?xt=urn:btih:a89be40ce171a21442003090b5de9d177a474951&dn=Death+by+Food+Pyramid+-+How+Shoddy+Science%2C+Sketchy+Politics+And+Shady+Special+Interests+Have+Ruined+Our+Health+%28epub%2Cmobi%2Cazw3%29+Gooner&xl=15844183&dl=15844183&tr=udp://tracker.openbittorrent.com:80/announce&tr=udp://tracker.istole.it:80/announce&tr=udp://tracker.publicbt.com:80/announce&tr=udp://12.rarbg.me:80/announce";
 

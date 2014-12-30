@@ -136,9 +136,88 @@ char *_substr(const char *string, int pos, int len)
     return substring;
 }
 
+int parselink(leveldb_t *db, const char *buf, const char* caller)
+{
+    int sockfd, rc, remain, reuse, len;
+    char *external_ip, *local_ip, *walk, *next, *read, *err, *bufptr;
+    char *xl, *dl;
+    const char *hash, *link;
+    size_t readlen;
+    size_t hashlen = HASHLEN;
+    struct params magnet;
+    struct sockaddr_in servaddr, cliaddr;
+    socklen_t slen = sizeof servaddr;
+    leveldb_options_t *options;
+    leveldb_readoptions_t *roptions;
+    leveldb_writeoptions_t *woptions;
+
+    /* parse the magnet link and get infohash */
+    if ( !(walk = strstr(buf, "btih:"))) {
+        debug(" - Skip: infohash not found\n");
+        return 1;
+    }
+    magnet.hash = _substr(walk, 5, HASHLEN - 1);
+    debug(" - BT infohash: %s\n", magnet.hash);
+    walk += HASHLEN + 5;
+
+    /* extract the remaining link parameters */
+    len = (int)strlen(buf);
+    magnet.num_tr = 0;
+    while ( (walk = strstr(walk, "&")))
+    {
+        walk++;
+        next = strstr(walk, "&");
+        len = (next) ? next - walk : (int)strlen(buf) - len;
+        if (walk[0] == 'd' && walk[1] == 'n') {
+            magnet.dn = _substr(walk, 3, len);
+            debug(" - dn: %s\n", magnet.dn);
+        } else if (walk[0] == 'x' && walk[1] == 'l') {
+            xl = _substr(walk, 3, len);
+            magnet.xl = atoi(xl);
+            debug(" - xl: %d\n", magnet.xl);
+        } else if (walk[0] == 'd' && walk[1] == 'l') {
+            dl = _substr(walk, 3, len);
+            magnet.dl = atoi(dl);
+            debug(" - dl: %d\n", magnet.dl);
+        } else if (walk[0] == 't' && walk[1] == 'r') {
+            magnet.tr[magnet.num_tr++] = _substr(walk, 3, len);
+            debug(" - tr[%d]: %s\n", magnet.num_tr - 1,
+                                     magnet.tr[magnet.num_tr - 1]);
+        }
+    }
+
+    /* check if the hash exists already */
+    if (err != NULL) {
+        leveldb_free(err);
+        debug("[share] Failed to open database\n");
+    }
+    read = leveldb_get(db, roptions, magnet.hash, HASHLEN, &readlen, &err);
+    if (err != NULL) {
+        leveldb_free(err);
+        debug("[share] Database read failed\n");
+    }
+
+    /* write the hash to the database, unless the hash is already in the
+       database, and the stored link is identical to the new link */
+    if (read && !strncmp(buf, read, BUFLEN)) {
+        debug(" - Skip: link already in database\n");
+    } else {
+        debug(" - Save link to database\n");
+        leveldb_put(db, woptions, magnet.hash, HASHLEN, buf, BUFLEN, &err);
+        if (err != NULL) {
+            leveldb_free(err);
+            debug("[share] Database write failed\n");
+        }
+    }
+
+    return 0;
+}
+
 void runserver(void)
 {
     debug("Start server...\n");
+    debug("%s\n", __func__);
+    // if (!__FUNC__) const char *__func__ = "runserver";
 
     int sockfd, rc, remain, reuse, len;
     char buf[BUFLEN + 1];
@@ -188,6 +267,9 @@ void runserver(void)
     woptions = leveldb_writeoptions_create();
     leveldb_options_set_create_if_missing(options, 1);
 
+    /* open database */
+    db = leveldb_open(options, DB, &err);
+
     loop
     {
         /* wait for incoming socket data */
@@ -200,7 +282,7 @@ void runserver(void)
 
         /* if this is a link request, send all links in database */
         if (!strncmp(buf, "r", BUFLEN)) {
-            debug(" - Link request\n");
+            debug(" - Received link request\n");
             leveldb_iterator_t* iter;
 
             /* open leveldb */
@@ -247,79 +329,22 @@ void runserver(void)
             continue;
         }
 
-        /* TODO move to function */
-        /* parse the magnet link and get infohash */
-        if (!(walk = strstr(buf, "btih:"))) {
-            debug(" - Skip: infohash not found\n");
-            continue;
-        }
-        magnet.hash = _substr(walk, 5, HASHLEN - 1);
-        debug(" - BT infohash: %s\n", magnet.hash);
-        walk += HASHLEN + 5;
-
-        /* extract the remaining link parameters */
-        len = (int)strlen(buf);
-        magnet.num_tr = 0;
-        while ( (walk = strstr(walk, "&")))
-        {
-            walk++;
-            next = strstr(walk, "&");
-            len = (next) ? next - walk : (int)strlen(buf) - len;
-            if (walk[0] == 'd' && walk[1] == 'n') {
-                magnet.dn = _substr(walk, 3, len);
-                debug(" - dn: %s\n", magnet.dn);
-            } else if (walk[0] == 'x' && walk[1] == 'l') {
-                xl = _substr(walk, 3, len);
-                magnet.xl = atoi(xl);
-                debug(" - xl: %d\n", magnet.xl);
-            } else if (walk[0] == 'd' && walk[1] == 'l') {
-                dl = _substr(walk, 3, len);
-                magnet.dl = atoi(dl);
-                debug(" - dl: %d\n", magnet.dl);
-            } else if (walk[0] == 't' && walk[1] == 'r') {
-                magnet.tr[magnet.num_tr++] = _substr(walk, 3, len);
-                debug(" - tr[%d]: %s\n", magnet.num_tr - 1,
-                                         magnet.tr[magnet.num_tr - 1]);
-            }
-        }
-
-        /* check if the hash exists already */
-        db = leveldb_open(options, DB, &err);
-        if (err != NULL) {
-            leveldb_free(err);
-            debug("[runserver] Failed to open database\n");
-        }
-        read = leveldb_get(db, roptions, magnet.hash, HASHLEN, &readlen, &err);
-        if (err != NULL) {
-            leveldb_free(err);
-            debug("[runserver] Database read failed\n");
-        }
-
-        /* write the hash to the database, unless the hash is already in the
-           database, and the stored link is identical to the new link */
-        if (read && !strncmp(buf, read, BUFLEN)) {
-            debug(" - Skip: link already in database\n");
-        } else {
-            debug(" - Save link to database\n");
-            leveldb_put(db, woptions, magnet.hash, HASHLEN, buf, BUFLEN, &err);
-            if (err != NULL) {
-                leveldb_free(err);
-                debug("[runserver] Database write failed\n");
-            }
-        }
-
-        leveldb_close(db);
+        parselink(db, buf, __func__);
     }
 
+    leveldb_close(db);
     if (close(sockfd) == -1) exit(1);
-
     free(external_ip);
     free(local_ip);
+
     exit(0);
 }
 
 void share(const char *ip)
 {
+    debug("%s\n", __func__);
+    // if (!__FUNC__) const char *__func__ = "share";
+
     int sockfd, rc, remain, reuse, len;
     char buf[BUFLEN], *bufptr, *err, *walk, *next, *read, *xl, *dl;
     const char *hash, *link;
@@ -360,10 +385,6 @@ void share(const char *ip)
     reuse = 1;
     rc = setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof reuse);
     if (rc < 0) die("[share] Cannot set socket to reuse");
-
-    /* bind socket to address */
-    // rc = bind(sockfd, (struct sockaddr *)&servaddr, slen);
-    // if (rc < 0) die("[share] Failed to bind socket");
 
     /* open leveldb */
     err = NULL;
@@ -407,10 +428,10 @@ void share(const char *ip)
     if (rc == -1) die("[share] Link request failed");
 
     /* wait for incoming socket data, block until "transmission complete"
-       signal received from node (TODO use TCP for this?) */
+       signal received from node (TODO use TCP sockets?) */
     loop
     {
-        /* wait for incoming socket data (TODO set timeout? set nonblocking?) */
+        /* wait for incoming socket data (TODO timeout and/or nonblocking?) */
         rc = recvfrom(sockfd, buf, BUFLEN, 0, (struct sockaddr *)&recvaddr, &slen);
         if (rc == -1) die("[share] recvfrom failed");
 
@@ -423,66 +444,7 @@ void share(const char *ip)
             break;
         }
 
-        /* TODO move to function */
-        /* parse the magnet link and get infohash */
-        if (!(walk = strstr(buf, "btih:"))) {
-            debug(" - Skip: infohash not found\n");
-            continue;
-        }
-        magnet.hash = _substr(walk, 5, HASHLEN - 1);
-        debug(" - BT infohash: %s\n", magnet.hash);
-        walk += HASHLEN + 5;
-
-        /* extract the remaining link parameters */
-        len = (int)strlen(buf);
-        magnet.num_tr = 0;
-        while ( (walk = strstr(walk, "&")))
-        {
-            walk++;
-            next = strstr(walk, "&");
-            len = (next) ? next - walk : (int)strlen(buf) - len;
-            if (walk[0] == 'd' && walk[1] == 'n') {
-                magnet.dn = _substr(walk, 3, len);
-                debug(" - dn: %s\n", magnet.dn);
-            } else if (walk[0] == 'x' && walk[1] == 'l') {
-                xl = _substr(walk, 3, len);
-                magnet.xl = atoi(xl);
-                debug(" - xl: %d\n", magnet.xl);
-            } else if (walk[0] == 'd' && walk[1] == 'l') {
-                dl = _substr(walk, 3, len);
-                magnet.dl = atoi(dl);
-                debug(" - dl: %d\n", magnet.dl);
-            } else if (walk[0] == 't' && walk[1] == 'r') {
-                magnet.tr[magnet.num_tr++] = _substr(walk, 3, len);
-                debug(" - tr[%d]: %s\n", magnet.num_tr - 1,
-                                         magnet.tr[magnet.num_tr - 1]);
-            }
-        }
-
-        /* check if the hash exists already */
-        db = leveldb_open(options, DB, &err);
-        if (err != NULL) {
-            leveldb_free(err);
-            debug("[share] Failed to open database\n");
-        }
-        read = leveldb_get(db, roptions, magnet.hash, HASHLEN, &readlen, &err);
-        if (err != NULL) {
-            leveldb_free(err);
-            debug("[share] Database read failed\n");
-        }
-
-        /* write the hash to the database, unless the hash is already in the
-           database, and the stored link is identical to the new link */
-        if (read && !strncmp(buf, read, BUFLEN)) {
-            debug(" - Skip: link already in database\n");
-        } else {
-            debug(" - Save link to database\n");
-            leveldb_put(db, woptions, magnet.hash, HASHLEN, buf, BUFLEN, &err);
-            if (err != NULL) {
-                leveldb_free(err);
-                debug("[share] Database write failed\n");
-            }
-        }
+        parselink(db, buf, __func__);
     }
 
     /* receive peers from node */
