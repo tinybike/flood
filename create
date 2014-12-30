@@ -1,13 +1,16 @@
 #!/bin/bash
-
 set -e
 trap "exit" INT
 
+# compile flood
 make clean
 make
 sudo make install
 
+# reset leveldb directory
 if [ "$1" == "reset" ]; then
     rm -Rf links
-    ./parse -f data/test2.xml-clean
+    if [ "$HOSTNAME" != "loopy" ]; then
+        ./parse -f data/test2.xml-clean
+    fi
 fi
