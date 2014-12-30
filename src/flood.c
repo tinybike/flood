@@ -196,6 +196,7 @@ void runserver(void)
         
         debug("Receive packet from %s:%d\n", inet_ntoa(cliaddr.sin_addr),
                                              ntohs(cliaddr.sin_port));
+        debug("Data: %s\n\n", buf);
 
         /* if this is a link request, send all links in database */
         if (!strncmp(buf, "r", BUFLEN)) {
