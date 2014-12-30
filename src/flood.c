@@ -151,6 +151,9 @@ int parselink(leveldb_t *db, char buf[BUFLEN - 1], const char* caller)
     leveldb_readoptions_t *roptions;
     leveldb_writeoptions_t *woptions;
 
+    roptions = leveldb_readoptions_create();
+    woptions = leveldb_writeoptions_create();
+
     /* parse the magnet link and get infohash */
     if ( !(walk = strstr(buf, "btih:"))) {
         debug(" - Skip: infohash not found\n");
@@ -263,8 +266,6 @@ void runserver(void)
     /* create the db if it doesn't exist already */
     err = NULL;
     options = leveldb_options_create();
-    roptions = leveldb_readoptions_create();
-    woptions = leveldb_writeoptions_create();
     leveldb_options_set_create_if_missing(options, 1);
 
     /* open database */
