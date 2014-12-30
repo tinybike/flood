@@ -484,18 +484,18 @@ void share(const char *ip)
     //     }
     // }
 
-    /* receive peers from node */
-    root = malloc(sizeof(struct node));
-    root->next = 0;
-    root->ip = "127.0.0.1";
-    peer = root;
-    if (peer != 0) {
-        while (peer->next != 0)
-        {
-            peer = peer->next;
-        }
-    }
-    free(peer);
+    // /* receive peers from node */
+    // root = malloc(sizeof(struct node));
+    // root->next = 0;
+    // root->ip = "127.0.0.1";
+    // peer = root;
+    // if (peer != 0) {
+    //     while (peer->next != 0)
+    //     {
+    //         peer = peer->next;
+    //     }
+    // }
+    // free(peer);
 
     leveldb_iter_destroy(iter);
     leveldb_close(db);
