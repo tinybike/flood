@@ -196,7 +196,7 @@ void runserver(void)
         
         debug("Receive packet from %s:%d\n", inet_ntoa(cliaddr.sin_addr),
                                              ntohs(cliaddr.sin_port));
-        debug("Data: %s\n\n", buf);
+        debug("Data: %s\n", buf);
 
         /* if this is a link request, send all links in database */
         if (!strncmp(buf, "r", BUFLEN)) {
@@ -404,6 +404,7 @@ void share(const char *ip)
     debug("Request links:\n");
     rc = sendto(sockfd, "r", 2, 0, (struct sockaddr *)&xtrnaddr, sizeof xtrnaddr);
     if (rc == -1) die("[share] Link request failed");
+    debug("rc: %d\n", rc);
 
     /* wait for incoming socket data, block until "transmission complete"
        signal received from node (TODO use TCP for this?) */
